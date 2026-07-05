@@ -13,5 +13,6 @@ services:
       # Debe apuntar a la URL de conexión de Neon (ej. postgres://user:pass@ep-lucky-shape-1234.us-east-2.aws.neon.tech/neondb)
       - DATABASE_URL=${DATABASE_URL}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-    command: ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+      - BRICS_CORS_ORIGINS=${BRICS_CORS_ORIGINS:-http://localhost:5173}
+    command: ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 

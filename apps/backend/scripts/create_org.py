@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from api.deps import hash_api_key
 from models.database import SessionLocal
 from models.domain import Org
 
@@ -27,7 +28,8 @@ def main():
         if db.query(Org).filter(Org.name == name).first():
             print(f"ERROR: ya existe org '{name}'")
             sys.exit(1)
-        org = Org(name=name, api_key=api_key)
+        # Se guarda el hash; el plaintext solo se imprime aquí, una vez.
+        org = Org(name=name, api_key=hash_api_key(api_key))
         db.add(org)
         db.commit()
         db.refresh(org)

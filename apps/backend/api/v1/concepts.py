@@ -5,17 +5,18 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from api.deps import get_current_org
 from models.database import get_db
-from models.domain import ConceptPrice, MasterConcept
+from models.domain import MasterConcept, Org
 from services.prices import get_last_price, get_price_history, get_price_stats
 
-# Catálogo maestro compartido entre tenants: requiere API key válida, sin filtro por org.
-router = APIRouter(prefix="/concepts", tags=["concepts"], dependencies=[Depends(get_current_org)])
+# Catálogo maestro (master_concepts) compartido entre tenants; los PRECIOS se
+# filtran por org (propios + semilla org_id NULL) en services/prices.py.
+router = APIRouter(prefix="/concepts", tags=["concepts"])
 
 
 # ---------------------------------------------------------------------------
@@ -77,12 +78,13 @@ def _get_concept_or_404(db: Session, concept_id: int) -> MasterConcept:
 @router.get("/{concept_id}/prices", response_model=list[PriceOut])
 def list_prices(
     concept_id: int,
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=1000),
     db: Session = Depends(get_db),
+    org: Org = Depends(get_current_org),
 ) -> list[PriceOut]:
     """Historial de precios de un concepto maestro, del más nuevo al más antiguo."""
     _get_concept_or_404(db, concept_id)
-    rows = get_price_history(db, concept_id, limit=limit)
+    rows = get_price_history(db, concept_id, org_id=org.id, limit=limit)
     return [PriceOut.model_validate(r) for r in rows]
 
 
@@ -90,10 +92,11 @@ def list_prices(
 def price_stats(
     concept_id: int,
     db: Session = Depends(get_db),
+    org: Org = Depends(get_current_org),
 ) -> StatsOut:
     """Estadísticas agregadas (min, max, avg, mediana, último precio) para un concepto."""
     _get_concept_or_404(db, concept_id)
-    stats = get_price_stats(db, concept_id)
+    stats = get_price_stats(db, concept_id, org_id=org.id)
     return StatsOut(**stats)
 
 
@@ -101,10 +104,11 @@ def price_stats(
 def get_concept(
     concept_id: int,
     db: Session = Depends(get_db),
+    org: Org = Depends(get_current_org),
 ) -> ConceptOut:
     """Información básica de un concepto maestro más su último precio observado."""
     concept = _get_concept_or_404(db, concept_id)
-    last = get_last_price(db, concept_id)
+    last = get_last_price(db, concept_id, org_id=org.id)
     return ConceptOut(
         id=concept.id,
         family=concept.family,

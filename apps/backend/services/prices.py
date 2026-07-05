@@ -9,10 +9,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import text
+from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 
 from models.domain import ConceptPrice
+
+
+def _org_scope(org_id: int):
+    """Precios visibles para un tenant: los suyos + el catálogo semilla (org_id NULL)."""
+    return or_(ConceptPrice.org_id == org_id, ConceptPrice.org_id.is_(None))
 
 
 def record_price(
@@ -20,6 +25,7 @@ def record_price(
     *,
     concept_id: int,
     unit_price: float,
+    org_id: Optional[int] = None,
     unit: Optional[str] = None,
     source_file: Optional[str] = None,
     project_name: Optional[str] = None,
@@ -35,6 +41,7 @@ def record_price(
 
     row = ConceptPrice(
         concept_id=concept_id,
+        org_id=org_id,
         unit_price=unit_price,
         unit=unit,
         source_file=source_file,
@@ -46,30 +53,30 @@ def record_price(
     return row
 
 
-def get_last_price(session: Session, concept_id: int) -> Optional[ConceptPrice]:
+def get_last_price(session: Session, concept_id: int, *, org_id: int) -> Optional[ConceptPrice]:
     """Return the most recent ConceptPrice for this concept (tie-break by created_at desc)."""
     return (
         session.query(ConceptPrice)
-        .filter(ConceptPrice.concept_id == concept_id)
+        .filter(ConceptPrice.concept_id == concept_id, _org_scope(org_id))
         .order_by(ConceptPrice.observed_at.desc(), ConceptPrice.created_at.desc())
         .first()
     )
 
 
 def get_price_history(
-    session: Session, concept_id: int, limit: int = 50
+    session: Session, concept_id: int, *, org_id: int, limit: int = 50
 ) -> list[ConceptPrice]:
     """Return up to *limit* ConceptPrice rows, newest first."""
     return (
         session.query(ConceptPrice)
-        .filter(ConceptPrice.concept_id == concept_id)
+        .filter(ConceptPrice.concept_id == concept_id, _org_scope(org_id))
         .order_by(ConceptPrice.observed_at.desc(), ConceptPrice.created_at.desc())
         .limit(limit)
         .all()
     )
 
 
-def get_price_stats(session: Session, concept_id: int) -> dict:
+def get_price_stats(session: Session, concept_id: int, *, org_id: int) -> dict:
     """Return aggregate stats computed in SQL.
 
     Returns:
@@ -97,9 +104,10 @@ def get_price_stats(session: Session, concept_id: int) -> dict:
                 max(observed_at)                                              AS last_observed_at
             FROM concept_prices
             WHERE concept_id = :cid
+              AND (org_id = :org_id OR org_id IS NULL)
             """
         ),
-        {"cid": concept_id},
+        {"cid": concept_id, "org_id": org_id},
     ).one()
 
     if row.cnt == 0:
@@ -113,7 +121,7 @@ def get_price_stats(session: Session, concept_id: int) -> dict:
             "median": None,
         }
 
-    last = get_last_price(session, concept_id)
+    last = get_last_price(session, concept_id, org_id=org_id)
     return {
         "count": int(row.cnt),
         "last_price": last.unit_price if last else None,

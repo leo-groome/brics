@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 
-const API_BASE = 'http://localhost:8000/api/v1';
+// En producción (Vercel): VITE_API_BASE=https://<backend-railway>/api/v1
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/api/v1';
 
 // API key del tenant (auth mínima Fase 0). En dev: .env.local → VITE_BRICS_API_KEY.
 const API_KEY = import.meta.env.VITE_BRICS_API_KEY ?? '';

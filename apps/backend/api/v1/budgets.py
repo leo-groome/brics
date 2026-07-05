@@ -87,6 +87,19 @@ def create_budget(
     return b
 
 
+@router.get("", response_model=list[BudgetOut])
+def list_budgets(
+    db: Session = Depends(get_db),
+    org: Org = Depends(get_current_org),
+) -> list[BudgetOut]:
+    return (
+        db.query(Budget)
+        .filter(Budget.org_id == org.id)
+        .order_by(Budget.id.desc())
+        .all()
+    )
+
+
 @router.get("/{budget_id}", response_model=BudgetOut)
 def get_budget(
     budget_id: int,

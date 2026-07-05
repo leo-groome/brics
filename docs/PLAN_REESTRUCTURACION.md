@@ -221,16 +221,19 @@ Ingesta de planos arquitectónicos → cuantificación automática → BOM → p
 
 # PARTE 3 — PLAN MVP (semana a semana)
 
-## Semana 1 — Cirugía y base
+## Semana 1 — Cirugía y base ✅ EJECUTADA 2026-07-05
 
-- [ ] **`.gitignore`: excluir `data/` completo** (XLSX de clientes) ANTES de cualquier `git add`.
-- [ ] **Rotar credencial de Neon** (password en claro en `apps/backend/.env`).
-- [ ] **Commit todo a git** antes de tocar nada.
-- [ ] **Alembic init** — la migración de `org_id` y todas las siguientes van versionadas; matar dependencia de `create_all()`.
-- [ ] Amputar: `workers/` (Celery), `api/v1/webhooks.py`, Evolution env vars, Redis del docker-compose, `HermesClient`. Mover diseño de `suppliers`/`quote_requests` a `docs/fase1.md`. Montar o borrar `api/v1/concepts.py`.
-- [ ] Reescribir `services/llm_client.py`: un solo cliente API (structured outputs + retry + logging de errores). Matar Codex CLI.
-- [ ] Migración: `org_id` en `budgets` y `concept_prices` (conceptos compartidos; precios y presupuestos por tenant). Auth mínima: API key por constructora en header. Clerk después, no ahora.
-- [ ] Normalizer: registrar campo `error` en failures (hoy 225 fallos sin causa).
+- [x] **`.gitignore`: excluir `data/` completo** (XLSX de clientes) ANTES de cualquier `git add`.
+- [ ] **Rotar credencial de Neon** (password en claro en `apps/backend/.env`). ← ÚNICO PENDIENTE (manual, consola Neon) + poner `OPENAI_API_KEY` real.
+- [x] **Commit todo a git** antes de tocar nada. (2e750e7)
+- [x] **Alembic init** — migración 0001 (orgs + org_id) aplicada en Neon. `create_all()` sigue en lifespan por ahora; retirarlo cuando el schema estabilice.
+- [x] Amputar: `workers/` (Celery), `api/v1/webhooks.py`, `api/v1/suppliers.py` + SuppliersView, Redis del docker-compose, `HermesClient`. Diseño archivado en `docs/fase1.md`. `api/v1/concepts.py` montado. (38df772)
+- [x] Reescribir `services/llm_client.py`: solo OpenAIClient (structured outputs + retry + logging). Codex CLI muerto. (38df772)
+- [x] Multi-tenant: tabla `orgs` (API key hasheada SHA-256), `org_id` en budgets (NOT NULL) y concept_prices (NULL = catálogo semilla), header `X-API-Key` en todos los routers, alta con `scripts/create_org.py`. (6c1763b)
+- [x] Normalizer: campo `error` en failures. (38df772)
+- [x] **Auditoría de seguridad post-Semana-1 (subagente): PASA CON OBSERVACIONES — todas corregidas**: filtro org en queries de precios (fuga cross-tenant latente), API key hasheada en DB, `API_BASE` y CORS configurables por env, límites en `limit`, `--reload` fuera del compose, `GET /budgets` (lista) agregado. **Riesgo aceptado Fase 0**: la API key del tenant viaja en el bundle del frontend (`VITE_BRICS_API_KEY`) — aceptable con 2 pilotos controlados; migrar a sesión server-side (Clerk o JWT httpOnly) antes de acceso externo/self-serve.
+
+**Hallazgo de datos (afecta Semana 2):** la DB real tenía 1,622 conceptos (no 3,601 — la ingesta murió a la mitad; los 3,601 están en `data/_extracted/_normalized/*.json`) y `concept_prices` no existía: hay CERO precios en DB. La ingesta nunca extrajo precios, solo conceptos. Semana 2 es re-ingesta completa (conceptos + precios), no solo re-embed.
 
 ## Semana 2 — Datos confiables + entregable
 
