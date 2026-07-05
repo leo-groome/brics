@@ -5,7 +5,7 @@ Uso:
     uv run python apps/backend/etl/run_normalize.py --limit 3      # smoke test 3 archivos
     uv run python apps/backend/etl/run_normalize.py --file "..."   # un solo archivo
     uv run python apps/backend/etl/run_normalize.py --dry-run      # sin DB, solo JSON
-    uv run python apps/backend/etl/run_normalize.py --workers 4    # paralelizar codex calls
+    uv run python apps/backend/etl/run_normalize.py --workers 4    # paralelizar llamadas LLM
     uv run python apps/backend/etl/run_normalize.py --resume       # saltar archivos ya en _normalized/
 """
 
@@ -44,11 +44,13 @@ def init_db():
     Base.metadata.create_all(bind=engine)
 
 
-def normalize_one_sheet(llm, filename: str, sheet_name: str, raw_text: str) -> tuple[list[dict], bool]:
-    """Normaliza una hoja. Retorna (concepts, success)."""
+def normalize_one_sheet(
+    llm, filename: str, sheet_name: str, raw_text: str
+) -> tuple[list[dict], str | None]:
+    """Normaliza una hoja. Retorna (concepts, error). error=None si tuvo éxito."""
     result = normalize_sheet(llm=llm, filename=filename, sheet_name=sheet_name, raw_text=raw_text)
     if result is None:
-        return [], False
+        return [], "llm_agoto_retries: sin JSON válido tras reintentos (ver log para el error de API)"
     out = []
     for c in result.concepts:
         out.append(
@@ -59,7 +61,7 @@ def normalize_one_sheet(llm, filename: str, sheet_name: str, raw_text: str) -> t
                 "source_file": filename,
             }
         )
-    return out, True
+    return out, None
 
 
 def main():
@@ -67,7 +69,7 @@ def main():
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--file", type=str, default=None)
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--workers", type=int, default=4, help="Parallel codex exec calls.")
+    ap.add_argument("--workers", type=int, default=4, help="Llamadas LLM en paralelo.")
     ap.add_argument("--resume", action="store_true", help="Skip files already in _normalized/.")
     ap.add_argument("--min-chars", type=int, default=300, help="Skip sheets más chicas que esto.")
     args = ap.parse_args()
@@ -144,13 +146,13 @@ def main():
                     for fut in as_completed(future_to_sheet):
                         sn = future_to_sheet[fut]
                         try:
-                            concepts, ok = fut.result()
+                            concepts, error = fut.result()
                         except Exception as e:  # noqa: BLE001
                             logger.exception("normalize_one_sheet exception en %s", sn)
-                            ok = False
+                            error = f"exception: {type(e).__name__}: {str(e)[:300]}"
                             concepts = []
-                        if not ok:
-                            failures.append({"file": filename, "sheet": sn})
+                        if error is not None:
+                            failures.append({"file": filename, "sheet": sn, "error": error})
                             continue
                         file_concepts.extend(concepts)
 

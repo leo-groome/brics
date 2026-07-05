@@ -103,15 +103,6 @@ def resolve(
         bl.match_confidence = 1.0  # decisión humana = certeza
         bl.match_status = "resolved"
         db.commit()
-        try:
-            from workers.tasks import quote_line_task
-            quote_line_task.delay(bl.id)
-        except Exception as e:
-            # logger no está importado como objeto global logger en friction.py? Vamos a revisar si logger existe.
-            # En la línea 15 dice: router = APIRouter(prefix="/friction", tags=["friction"])
-            # Pero arriba no vimos logger importado. Importemos y usemos logger.
-            import logging
-            logging.getLogger(__name__).error("No se pudo encolar la tarea de cotización para la línea %d: %s", bl.id, str(e))
         return {"status": "resolved", "matched_concept_id": mc.id}
 
     if payload.action == "create_new_concept":
@@ -133,12 +124,6 @@ def resolve(
         bl.match_confidence = 1.0
         bl.match_status = "resolved"
         db.commit()
-        try:
-            from workers.tasks import quote_line_task
-            quote_line_task.delay(bl.id)
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error("No se pudo encolar la tarea de cotización para la línea %d: %s", bl.id, str(e))
         return {"status": "resolved", "matched_concept_id": mc.id, "new_concept": True}
 
     if payload.action == "discard":

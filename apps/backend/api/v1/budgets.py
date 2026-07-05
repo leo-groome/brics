@@ -138,12 +138,5 @@ def add_lines_bulk(
     db.commit()
     for bl in created:
         db.refresh(bl)
-        if bl.match_status == "auto":
-            try:
-                from workers.tasks import quote_line_task
-                quote_line_task.delay(bl.id)
-            except Exception as e:
-                # Si Celery/Redis no está corriendo, registrar log y continuar (tolerante a fallos)
-                logger.error("No se pudo encolar la tarea de cotización para la línea %d: %s", bl.id, str(e))
     return created
 

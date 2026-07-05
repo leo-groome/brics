@@ -2,7 +2,7 @@
 import { onMounted } from 'vue';
 import { RouterLink, RouterView } from 'vue-router';
 import { useBricsStore } from './stores/brics';
-import { LayoutDashboard, AlertOctagon, Users, Hammer } from '@lucide/vue';
+import { LayoutDashboard, AlertOctagon, Hammer } from '@lucide/vue';
 
 const store = useBricsStore();
 
@@ -39,11 +39,6 @@ onMounted(() => {
           <span v-if="store.frictionItems.length > 0" class="badge-counter font-mono">
             {{ store.frictionItems.length }}
           </span>
-        </RouterLink>
-        
-        <RouterLink to="/suppliers" class="nav-item" active-class="active">
-          <Users :size="18" />
-          <span>Proveedores</span>
         </RouterLink>
       </nav>
       

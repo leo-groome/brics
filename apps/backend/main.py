@@ -7,9 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from api.v1 import budgets as budgets_router
+from api.v1 import concepts as concepts_router
 from api.v1 import friction as friction_router
-from api.v1 import suppliers as suppliers_router
-from api.v1 import webhooks as webhooks_router
 from models.database import engine, Base
 from models import domain  # noqa: F401 — register tables on Base.metadata
 from services import embedder as embedder_module
@@ -54,9 +53,8 @@ app.add_middleware(
 )
 
 app.include_router(budgets_router.router, prefix="/api/v1")
+app.include_router(concepts_router.router, prefix="/api/v1")
 app.include_router(friction_router.router, prefix="/api/v1")
-app.include_router(suppliers_router.router, prefix="/api/v1")
-app.include_router(webhooks_router.router, prefix="/api/v1")
 
 
 @app.get("/health")

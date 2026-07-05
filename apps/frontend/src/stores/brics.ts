@@ -37,21 +37,12 @@ export interface FrictionItem {
   top_candidates: Candidate[];
 }
 
-export interface Supplier {
-  id: number;
-  name: string;
-  whatsapp_number: string;
-  families: string[];
-  active: boolean;
-}
-
 export const useBricsStore = defineStore('brics', {
   state: () => ({
     budgets: [] as Budget[],
     activeBudget: null as Budget | null,
     activeLines: [] as BudgetLine[],
     frictionItems: [] as FrictionItem[],
-    suppliers: [] as Supplier[],
     loading: false,
     error: null as string | null,
   }),
@@ -185,47 +176,6 @@ export const useBricsStore = defineStore('brics', {
         throw err;
       } finally {
         this.loading = false;
-      }
-    },
-
-    async fetchSuppliers() {
-      try {
-        const res = await fetch(`${API_BASE}/suppliers`);
-        if (res.ok) {
-          this.suppliers = await res.json();
-        }
-      } catch (err) {
-        console.error('Error fetching suppliers', err);
-      }
-    },
-
-    async createSupplier(supplier: Omit<Supplier, 'id'>) {
-      try {
-        const res = await fetch(`${API_BASE}/suppliers`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(supplier),
-        });
-        if (!res.ok) throw new Error('Error al registrar proveedor');
-        const data = await res.json();
-        this.suppliers.push(data);
-        return data;
-      } catch (err: any) {
-        this.error = err.message;
-        throw err;
-      }
-    },
-
-    async deleteSupplier(id: number) {
-      try {
-        const res = await fetch(`${API_BASE}/suppliers/${id}`, {
-          method: 'DELETE',
-        });
-        if (!res.ok) throw new Error('Error al eliminar proveedor');
-        this.suppliers = this.suppliers.filter(s => s.id !== id);
-      } catch (err: any) {
-        this.error = err.message;
-        throw err;
       }
     }
   }
