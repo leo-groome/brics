@@ -8,12 +8,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from api.deps import get_current_org
 from models.database import get_db
-from models.domain import Budget, BudgetLine
+from models.domain import Budget, BudgetLine, Org
 from services.embedder import Embedder
 from services.matcher import match_batch
 
 router = APIRouter(prefix="/budgets", tags=["budgets"])
+
+
+def _get_own_budget_or_404(db: Session, budget_id: int, org: Org) -> Budget:
+    b = db.get(Budget, budget_id)
+    if b is None or b.org_id != org.id:
+        # 404 (no 403): no revelar existencia de budgets de otros tenants.
+        raise HTTPException(404, "Budget no encontrado")
+    return b
 
 _embedder = Embedder()
 
@@ -60,8 +69,13 @@ class BudgetLineOut(BaseModel):
 
 
 @router.post("", response_model=BudgetOut, status_code=201)
-def create_budget(payload: BudgetCreate, db: Session = Depends(get_db)) -> BudgetOut:
+def create_budget(
+    payload: BudgetCreate,
+    db: Session = Depends(get_db),
+    org: Org = Depends(get_current_org),
+) -> BudgetOut:
     b = Budget(
+        org_id=org.id,
         project_name=payload.project_name,
         project_type=payload.project_type,
         region=payload.region,
@@ -74,24 +88,29 @@ def create_budget(payload: BudgetCreate, db: Session = Depends(get_db)) -> Budge
 
 
 @router.get("/{budget_id}", response_model=BudgetOut)
-def get_budget(budget_id: int, db: Session = Depends(get_db)) -> BudgetOut:
-    b = db.get(Budget, budget_id)
-    if b is None:
-        raise HTTPException(404, "Budget no encontrado")
-    return b
+def get_budget(
+    budget_id: int,
+    db: Session = Depends(get_db),
+    org: Org = Depends(get_current_org),
+) -> BudgetOut:
+    return _get_own_budget_or_404(db, budget_id, org)
 
 
 @router.get("/{budget_id}/lines", response_model=list[BudgetLineOut])
-def list_lines(budget_id: int, db: Session = Depends(get_db)) -> list[BudgetLineOut]:
-    b = db.get(Budget, budget_id)
-    if b is None:
-        raise HTTPException(404, "Budget no encontrado")
-    return b.lines
+def list_lines(
+    budget_id: int,
+    db: Session = Depends(get_db),
+    org: Org = Depends(get_current_org),
+) -> list[BudgetLineOut]:
+    return _get_own_budget_or_404(db, budget_id, org).lines
 
 
 @router.post("/{budget_id}/lines/bulk", response_model=list[BudgetLineOut], status_code=201)
 def add_lines_bulk(
-    budget_id: int, payload: BomBulkIn, db: Session = Depends(get_db)
+    budget_id: int,
+    payload: BomBulkIn,
+    db: Session = Depends(get_db),
+    org: Org = Depends(get_current_org),
 ) -> list[BudgetLineOut]:
     """Ingesta del BOM crudo. Match semántico inmediato por línea.
 
@@ -99,9 +118,7 @@ def add_lines_bulk(
     <  0.95 confianza → match_status='friction'
     Catálogo vacío    → match_status='missing'
     """
-    b = db.get(Budget, budget_id)
-    if b is None:
-        raise HTTPException(404, "Budget no encontrado")
+    b = _get_own_budget_or_404(db, budget_id, org)
 
     results = match_batch(
         session=db,

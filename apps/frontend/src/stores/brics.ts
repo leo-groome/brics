@@ -2,6 +2,13 @@ import { defineStore } from 'pinia';
 
 const API_BASE = 'http://localhost:8000/api/v1';
 
+// API key del tenant (auth mínima Fase 0). En dev: .env.local → VITE_BRICS_API_KEY.
+const API_KEY = import.meta.env.VITE_BRICS_API_KEY ?? '';
+
+function apiHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return { 'X-API-Key': API_KEY, ...extra };
+}
+
 export interface Budget {
   id: number;
   project_name: string | null;
@@ -54,7 +61,7 @@ export const useBricsStore = defineStore('brics', {
         // En el backend no hay endpoint list budgets, pero si se agrega después, o podemos crear uno.
         // Si no está, podemos simular que el backend devuelve un listado o manejarlo localmente por el momento.
         // El api/v1/budgets.py tiene GET /budgets/{id}. Vamos a implementar un mock/fetch si falla.
-        const res = await fetch(`${API_BASE}/budgets`);
+        const res = await fetch(`${API_BASE}/budgets`, { headers: apiHeaders() });
         if (res.ok) {
           this.budgets = await res.json();
         }
@@ -71,7 +78,7 @@ export const useBricsStore = defineStore('brics', {
       try {
         const res = await fetch(`${API_BASE}/budgets`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: apiHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             project_name: projectName,
             project_type: projectType,
@@ -95,7 +102,7 @@ export const useBricsStore = defineStore('brics', {
       this.loading = true;
       this.error = null;
       try {
-        const res = await fetch(`${API_BASE}/budgets/${id}`);
+        const res = await fetch(`${API_BASE}/budgets/${id}`, { headers: apiHeaders() });
         if (!res.ok) throw new Error('Error al obtener presupuesto');
         this.activeBudget = await res.json();
         await this.fetchBudgetLines(id);
@@ -108,7 +115,7 @@ export const useBricsStore = defineStore('brics', {
 
     async fetchBudgetLines(budgetId: number) {
       try {
-        const res = await fetch(`${API_BASE}/budgets/${budgetId}/lines`);
+        const res = await fetch(`${API_BASE}/budgets/${budgetId}/lines`, { headers: apiHeaders() });
         if (res.ok) {
           this.activeLines = await res.json();
         }
@@ -123,7 +130,7 @@ export const useBricsStore = defineStore('brics', {
       try {
         const res = await fetch(`${API_BASE}/budgets/${budgetId}/lines/bulk`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: apiHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ lines }),
         });
         if (!res.ok) throw new Error('Error al subir el catálogo BOM');
@@ -142,7 +149,7 @@ export const useBricsStore = defineStore('brics', {
 
     async fetchFrictionItems() {
       try {
-        const res = await fetch(`${API_BASE}/friction/pending`);
+        const res = await fetch(`${API_BASE}/friction/pending`, { headers: apiHeaders() });
         if (res.ok) {
           this.frictionItems = await res.json();
         }
@@ -157,7 +164,7 @@ export const useBricsStore = defineStore('brics', {
       try {
         const res = await fetch(`${API_BASE}/friction/${lineId}/resolve`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: apiHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error('Error al resolver fricción');

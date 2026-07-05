@@ -21,6 +21,17 @@ from .database import Base
 EMBEDDING_DIM = 1024
 
 
+class Org(Base):
+    """Tenant = una constructora. Auth mínima por API key en header X-API-Key."""
+
+    __tablename__ = "orgs"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    api_key = Column(String, nullable=False, unique=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
 class MasterConcept(Base):
     """Catálogo Maestro — fuente de verdad del lenguaje técnico (sin precios)."""
 
@@ -64,6 +75,7 @@ class Budget(Base):
     __tablename__ = "budgets"
 
     id = Column(BigInteger, primary_key=True, index=True)
+    org_id = Column(BigInteger, ForeignKey("orgs.id"), nullable=False, index=True)
     user_id = Column(String, nullable=True, index=True)
     project_name = Column(String, nullable=True)
     project_type = Column(String, nullable=True)
@@ -129,6 +141,8 @@ class ConceptPrice(Base):
     concept_id = Column(
         BigInteger, ForeignKey("master_concepts.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    # NULL = precio del catálogo semilla (histórico compartido); no-NULL = precio del tenant.
+    org_id = Column(BigInteger, ForeignKey("orgs.id"), nullable=True, index=True)
     unit_price = Column(Float, nullable=False)
     unit = Column(String, nullable=True)
     source_file = Column(String, nullable=True)

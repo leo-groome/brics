@@ -8,8 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from api.deps import get_current_org
 from models.database import get_db
-from models.domain import BudgetLine, MasterConcept
+from models.domain import Budget, BudgetLine, MasterConcept, Org
 from services.embedder import Embedder, concept_to_embed_text
 
 router = APIRouter(prefix="/friction", tags=["friction"])
@@ -50,10 +51,15 @@ class DiscardPayload(BaseModel):
 
 
 @router.get("/pending", response_model=list[FrictionItemOut])
-def list_pending(limit: int = 50, db: Session = Depends(get_db)) -> list[FrictionItemOut]:
+def list_pending(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    org: Org = Depends(get_current_org),
+) -> list[FrictionItemOut]:
     rows = (
         db.query(BudgetLine)
-        .filter(BudgetLine.match_status == "friction")
+        .join(Budget, BudgetLine.budget_id == Budget.id)
+        .filter(Budget.org_id == org.id, BudgetLine.match_status == "friction")
         .order_by(BudgetLine.id)
         .limit(limit)
         .all()
@@ -87,9 +93,11 @@ def resolve(
     budget_line_id: int,
     payload: SelectCandidatePayload | CreateNewConceptPayload | DiscardPayload,
     db: Session = Depends(get_db),
+    org: Org = Depends(get_current_org),
 ):
     bl = db.get(BudgetLine, budget_line_id)
-    if bl is None:
+    if bl is None or bl.budget.org_id != org.id:
+        # 404 (no 403): no revelar existencia de líneas de otros tenants.
         raise HTTPException(404, "BudgetLine no encontrada")
     if bl.match_status != "friction":
         raise HTTPException(409, f"línea ya está en estado '{bl.match_status}'")

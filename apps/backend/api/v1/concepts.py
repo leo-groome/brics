@@ -9,11 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from api.deps import get_current_org
 from models.database import get_db
 from models.domain import ConceptPrice, MasterConcept
 from services.prices import get_last_price, get_price_history, get_price_stats
 
-router = APIRouter(prefix="/concepts", tags=["concepts"])
+# Catálogo maestro compartido entre tenants: requiere API key válida, sin filtro por org.
+router = APIRouter(prefix="/concepts", tags=["concepts"], dependencies=[Depends(get_current_org)])
 
 
 # ---------------------------------------------------------------------------
